@@ -49,7 +49,7 @@ function showMidiOutSelM(elem, checkType) {
         } else {
             message="Select MIDI device.";
             className="alert alert-info";
-        } 
+        }
         break;
       case "INOUT":
         if(typeof mIn!="object" || typeof mOut!="object") {
@@ -73,7 +73,7 @@ function showMidiOutSelM(elem, checkType) {
 
 function lubi (word) {
     // To use Kanji to Hiragana API, it is allow nsx-1 to speech every Japanese.
-    // play sound 
+    // play sound
     var now=window.performance.now();
     mOut.send([0xc1, 0x0b], now);
     mOut.send([0x91, 0x4f, 0x7f], now);
@@ -82,7 +82,7 @@ function lubi (word) {
     mOut.send([0x91, 0x4a, 0x7f], now+200);
     mOut.send([0x91, 0x48, 0x00], now+380);
     mOut.send([0x91, 0x4a, 0x00], now+420);
-    
+
     speechWord=word.replace(/ /g, "");
     document.getElementById("final_span").innerHTML=speechWord;
     if(playbackMode=="repeat") {
@@ -219,41 +219,44 @@ document.getElementById("start").addEventListener("click", function(event) {
 
 
 function playKodama(spWord ,delay) {
-    
-    spWord=spWord.replace(/。/g, "").replace(/ /g, "");
 
-    var notHiragana=false;
-    if(spWord.match(/^[\u3040-\u309F]+$/)==null) {
-        spWord="ごめんなさいひらがなしかよめません";
-        document.getElementById("kanji").style.removeProperty("visibility");
-        notHiragana=true;
-    }
-    
-    var sysEx=nsx1.getSysExByText(spWord);
-    var now=window.performance.now();
-    for(var i=0; i<sysEx.length; i++) {
-        mOut.send(sysEx[i], now+i*10);
-    }
-    var interval=240;
-    var start=window.performance.now()+delay+150;
-    var stringSearch = ["ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "っ", "ゃ", "ゅ","ょ", "ゎ", "。"];
-    var count, aCount=0;
-    for(var si=0; si<stringSearch.length; si++) {
-        var ss=stringSearch[si];
-        for(var ci=count=0; ci<spWord.length; count+=+(ss===spWord[ci++]));
-        aCount+=count;
-    }
-    for(var i=0; i<spWord.length-aCount; i++) {
-        mOut.send([0x90, 0x3c, 0x7f],start+i*interval);
-        mOut.send([0x90, 0x3c, 0x00],start+(i+1)*interval);
-        if(notHiragana==true) {
-            notHiragana=false;
-            var timerId=setInterval(function() {
-                document.getElementById("kanji").style.setProperty("visibility", "hidden");
-                clearInterval(timerId);
-            }, 5000);
+    toHiragana(spWord, function (word) {
+
+        spWord=word.replace(/。/g, "").replace(/ /g, "");
+
+        var notHiragana=false;
+        if(spWord.match(/^[\u3040-\u309F]+$/)==null) {
+            spWord="ごめんなさいひらがなしかよめません";
+            document.getElementById("kanji").style.removeProperty("visibility");
+            notHiragana=true;
         }
-    }
+
+        var sysEx=nsx1.getSysExByText(spWord);
+        var now=window.performance.now();
+        for(var i=0; i<sysEx.length; i++) {
+            mOut.send(sysEx[i], now+i*10);
+        }
+        var interval=240;
+        var start=window.performance.now()+delay+150;
+        var stringSearch = ["ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "っ", "ゃ", "ゅ","ょ", "ゎ", "。"];
+        var count, aCount=0;
+        for(var si=0; si<stringSearch.length; si++) {
+            var ss=stringSearch[si];
+            for(var ci=count=0; ci<spWord.length; count+=+(ss===spWord[ci++]));
+            aCount+=count;
+        }
+        for(var i=0; i<spWord.length-aCount; i++) {
+            mOut.send([0x90, 0x3c, 0x7f],start+i*interval);
+            mOut.send([0x90, 0x3c, 0x00],start+(i+1)*interval);
+            if(notHiragana==true) {
+                notHiragana=false;
+                var timerId=setInterval(function() {
+                    document.getElementById("kanji").style.setProperty("visibility", "hidden");
+                    clearInterval(timerId);
+                }, 5000);
+            }
+        }
+    });
 }
 
 // Web MIDI API
@@ -266,8 +269,8 @@ navigator.requestMIDIAccess( { sysex: true } ).then( scb, ecb );
 function scb(access){
     var midi=access;
     inputs=midi.inputs();
-    outputs=midi.outputs();    
-    
+    outputs=midi.outputs();
+
     // MIDI OUT
     var mo=document.getElementById("midiOutSel");
     for(var i=0; i<outputs.length; i++) {
@@ -311,7 +314,7 @@ document.getElementById("resetAllController").addEventListener("click", function
 
     var msg=[ 0xB0, 0x79, 0x00 ];
     mOut.send( msg );
-    
+
     var msg=[ 0xB0, 0x7B, 0x00 ];
     mOut.send( msg );
 
@@ -319,3 +322,20 @@ document.getElementById("resetAllController").addEventListener("click", function
     mOut.send( msg );
 
 });
+
+
+function toHiragana(word, callback) {
+    var form = new FormData();
+    form.append('text', word);
+
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/kakasi', true);
+
+    xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+            callback(xhr.responseText.replace(/\\n|\"/g, ''));
+        }
+    };
+    xhr.send(form);
+};
+
